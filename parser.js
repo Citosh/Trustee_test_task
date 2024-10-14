@@ -73,10 +73,9 @@ async function scrapeMultiplex() {
     for (const date in result) {
         const formattedDate = date.split('.').join(''); 
         const urlWithDate = `${baseUrl}#${formattedDate}`; // Construct the new URL
-        console.log(urlWithDate)
+
         const dateResponse = await axios.get(urlWithDate);
         const $datePage = cheerio.load(dateResponse.data);
-        
         // Extract movie titles and sessions for the specific date
         const sessionsMap = await extractTitleSessions($datePage);
 
