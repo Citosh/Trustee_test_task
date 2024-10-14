@@ -1,6 +1,6 @@
 // Load environment variables from a .env file
 require('dotenv').config();
-
+const {scrapeMultiplex} = require('./parser.js')
 // Import required modules
 const express = require('express');
 const { google } = require('googleapis');
@@ -89,6 +89,16 @@ app.get('/events', (req, res) => {
     res.json(events);
   });
 });
+
+app.get('/time', async (req, res)=>{
+  try {
+    const data = await scrapeMultiplex();
+    res.send(data)
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({ error: 'An error occurred' });
+  }
+})
 
 // Start the Express server
 app.listen(3000, () => console.log('Server running at 3000'));
