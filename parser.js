@@ -82,18 +82,18 @@ async function scrapeMultiplex() {
     for (const date in hrefMap) {
         const href = hrefMap[date];
 
-        const previousContent = await page.content(); // Отримуємо HTML контент сторінки
+        // const previousContent = await page.content(); // Отримуємо HTML контент сторінки
 
         await page.click(`a[href="${href}"]`); // Click the link for the specific date
 
-        await page.waitForFunction(
-            (previousContent) => document.body.innerHTML !== previousContent,
-            { timeout: 60000 },
-            previousContent
-        );
+        // await page.waitForFunction(
+        //     (previousContent) => document.body.innerHTML !== previousContent,
+        //     { timeout: 60000 },
+        //     previousContent
+        // );
 
         // Alternative to wait for navigation: wait for specific element to ensure page has changed
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // await new Promise(resolve => setTimeout(resolve, 3000));
 
         await page.waitForSelector('div.sessions.showmore', { timeout: 60000 }); // Increase timeout if necessary
 
