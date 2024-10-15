@@ -1,97 +1,122 @@
 const moment = require('moment');
 require('moment/locale/uk'); // Ensure Ukrainian locale is loaded
+const puppeteer = require('puppeteer');
 const axios = require('axios');
-const cheerio = require('cheerio'); 
+const cheerio = require("cheerio");
 
-async function extractDates($, year) {
+async function extractDates(page) {
     const result = {};
+    const hrefMap = {}; // Store href separately
 
     // Extract dates
-    $('body > div.mob_fix_container.mob_fix_container-cinema > div.cinema_schedule_header > div > div > a').each((index, element) => {
-        const dateText = $(element).find('p.dateval > span.is-desktop').text().trim(); // Extract date from span
-        if (dateText) { // If dateText is not empty
-            const fullDateText = `${dateText} ${year}`; // Append the year
+    const dateSelectionLinks = await page.$$eval('.date_selection a.date', links =>
+        links.map(link => ({
+            href: link.getAttribute('href'),
+            dateText: link.querySelector('p.dateval span.is-desktop')?.textContent.trim()
+        }))
+    );
+
+    // Extract year from page content or assume the current year
+    const year = moment().year();
+
+    dateSelectionLinks.forEach(({ href, dateText }) => {
+        if (dateText) {
+            const fullDateText = `${dateText} ${year}`;
             const date = moment(fullDateText, 'D MMMM YYYY', 'uk').format('DD.MM.YYYY');
-            result[date] = {}; // Initialize result object for this date
+            result[date] = {}; // Initialize as an empty object for movies and sessions
+            hrefMap[date] = href; // Store the href in a separate map
         }
     });
 
-    return result;
+    return { result, hrefMap }; // Return both result and hrefMap
 }
 
-async function extractTitleSessions($) {
+async function extractTitleSessions(page) {
     const sessionsMap = [];
-    // Select all movie title elements in the cinema schedule
-    await Promise.all($('body > div.mob_fix_container.mob_fix_container-cinema > div.cinema_schedule_films > div > div:nth-child(2) > div > div > a').map(async (index, element) => {
-        const titleElement = $(element); // Wrap the element with Cheerio
-        const title = titleElement.attr('title').trim(); // Extract movie title
-        const sessions = [];
 
-        // Get the closest filmElement to this titleElement
-        const filmElement = titleElement.closest('div'); // Get the closest div containing the title
-        filmElement.find('div.sessions.showmore > a.ns.locked > p.time > span').each((i, timeElement) => {
-            const startTime = $(timeElement).text().trim(); // e.g., "10:10"
-            sessions.push([startTime, null]); // Placeholder for end time
-        });
+    // Extract movie titles and sessions
+    const movies = await page.$$eval(
+        'body > div.mob_fix_container.mob_fix_container-cinema > div.cinema_schedule_films > div > div:nth-child(3) > div > div > a',
+        movieLinks =>
+            movieLinks.map(link => ({
+                title: link.getAttribute('title') ? link.getAttribute('title').trim() : '', // Parse movie title
+                sessions: Array.from(link.closest('div').querySelectorAll('div.sessions.showmore > a.ns.locked > p.time > span')).map(
+                    timeElement => timeElement ? timeElement.textContent.trim() : '' // Handle potential null for session times
+                )
+            }))
+    );
 
-        // Store title and sessions for later processing
-        sessionsMap.push({ title, sessions, titleElement }); // titleElement is already a Cheerio object
-    }).get()); // Await all async map items
-
-    return sessionsMap;
+    return movies; // No href needed here
 }
 
-async function extractMovieDuration(titleElement) {
-    const movieLink = titleElement.attr('href');
-    const movieResponse = await axios.get(`https://multiplex.ua${movieLink}`);
+async function extractMovieDuration(movieHref) {
+    const movieResponse = await axios.get(`https://multiplex.ua${movieHref}`);
     const moviePage = cheerio.load(movieResponse.data);
     const durationText = moviePage('body > div.mob_fix_container > div > div > div > div.column2 > ul > li:nth-child(10) > p.val').text().trim();
-    return moment.duration(durationText);
+    return moment.duration(durationText); // Return duration in a moment.js format
 }
 
 function calculateEndTimes(sessions, duration, date) {
-    return sessions.map(session => {
-        const startMoment = moment(`${date} ${session[0]}`, 'DD.MM.YYYY HH:mm');
+    return sessions.map(startTime => {
+        const startMoment = moment(`${date} ${startTime}`, 'DD.MM.YYYY HH:mm');
         const endMoment = startMoment.clone().add(duration);
-        return [startMoment.format('DD.MM.YYYY HH:mm'), endMoment.format('DD.MM.YYYY HH:mm')];
+        return [startMoment.format('HH:mm'), endMoment.format('HH:mm')]; // Return start and end times
     });
 }
 
 async function scrapeMultiplex() {
-    const baseUrl = 'https://multiplex.ua/cinema/kyiv/lavina'; // Base URL
-    const year = 2024; // Define the year explicitly
+    const browser = await puppeteer.launch({ headless: false });
+    const page = await browser.newPage();
+    const baseUrl = 'https://multiplex.ua/cinema/kyiv/lavina';
 
     // Set moment to use Ukrainian locale
     moment.locale('uk');
 
-    // First, extract the initial page to get the dates
-    const initialResponse = await axios.get(baseUrl);
-    const $ = cheerio.load(initialResponse.data);
-    let result = await extractDates($, year); // Get dates
+    // Navigate to the base URL
+    await page.goto(baseUrl);
 
-    // Loop through each date to modify the URL and scrape the sessions
-    for (const date in result) {
-        const formattedDate = date.split('.').join(''); 
-        const urlWithDate = `${baseUrl}#${formattedDate}`; // Construct the new URL
+    // Extract dates and hrefs separately
+    const { result, hrefMap } = await extractDates(page);
 
-        const dateResponse = await axios.get(urlWithDate);
-        const $datePage = cheerio.load(dateResponse.data);
-        // Extract movie titles and sessions for the specific date
-        const sessionsMap = await extractTitleSessions($datePage);
+    // Loop through each date, click the link, and scrape the session data
+    for (const date in hrefMap) {
+        const href = hrefMap[date];
 
-        // Extract movie durations and calculate end times
-        await Promise.all(sessionsMap.map(async ({ title, sessions, titleElement }) => {
-            const duration = await extractMovieDuration(titleElement);
+        const previousContent = await page.content(); // Отримуємо HTML контент сторінки
 
-            // Calculate end times for the date
+        await page.click(`a[href="${href}"]`); // Click the link for the specific date
+
+        await page.waitForFunction(
+            (previousContent) => document.body.innerHTML !== previousContent,
+            { timeout: 60000 },
+            previousContent
+        );
+
+        // Alternative to wait for navigation: wait for specific element to ensure page has changed
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        await page.waitForSelector('div.sessions.showmore', { timeout: 60000 }); // Increase timeout if necessary
+
+        // Extract movie titles and sessions for this specific date
+        const sessionsMap = await extractTitleSessions(page);
+
+        // Loop through each movie to get its duration and calculate session times
+        await Promise.all(sessionsMap.map(async ({ title, sessions }) => {
+            const duration = await extractMovieDuration(href); // Get movie duration
+
+            // Calculate end times for the sessions
             const updatedSessions = calculateEndTimes(sessions, duration, date);
+
+            // Store the movie title and session times under the specific date
             result[date][title] = updatedSessions;
         }));
     }
 
-    return result;
+    await browser.close();
+
+    return result; // Final result structure without hrefs
 }
 
 module.exports = {
     scrapeMultiplex,
-}
+};
