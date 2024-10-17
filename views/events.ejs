@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Кіносеанси</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <h1>Рекомендовані кіносеанси</h1>
+
+  <% Object.entries(filteredSessions).forEach(([date, films]) => { %>
+    <h2><%= date %></h2>
+    <table>
+      <tr>
+        <th>Фільм</th>
+        <th>Час початку</th>
+        <th>Час закінчення</th>
+      </tr>
+      <% Object.entries(films).forEach(([filmName, sessions]) => { %>
+        <% sessions.forEach(([start, end]) => { %>
+          <tr>
+            <td><%= filmName %></td>
+            <td><%= start.split(' ')[1] %></td>
+            <td><%= end.split(' ')[1] %></td>
+          </tr>
+        <% }) %>
+      <% }) %>
+    </table>
+  <% }) %>
+
+</body>
+</html>
