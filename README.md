@@ -5,13 +5,19 @@ This project is a web application that integrates with the Google Calendar API t
 
 The application includes a controller that handles OAuth2 authentication with Google, fetches calendar events, and retrieves film session data.
 ### 1. Clone the repository:
+```bash
 git clone https://github.com/Citosh/Trustee_test_task.git
+```
 ### 2. Install dependencies:
+```bash
 npm i
+```
 ### 3. Set up Google Calendar API keys:
 Before launching, you need to obtain Google Calendar API keys and set them up in the .env file. Refer to the .env.dist file for the required environment variables.
 ### 4. Launch the app:
-npm run dev
+```bash
+npm run dev 
+```
 ### 5. Complete OAuth
 Go to the following link to complete the OAuth process:
 http://localhost:3000/
