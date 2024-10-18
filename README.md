@@ -22,7 +22,7 @@ npm run dev
 Go to the following link to complete the OAuth process:
 http://localhost:3000/
 ### 6. Load events:
-Once OAuth is complete, go to the following link to load event data from the parser (this usually take 20-25 seconds)
+Once OAuth is complete, go to the following link to load event data from the parser (this usually take 7-5 seconds)
 http://localhost:3000/events
 
 ## Controller Overview
