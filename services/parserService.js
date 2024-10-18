@@ -4,6 +4,7 @@ const moment = require('moment');
 const cheerio = require('cheerio');
 
 const MAX_FILM_SESSIONS_QUANTITY = 50; // To avoid recursion and a potentially endless cycle.
+const movieDurationsCache = {}; // Object to store unique movie durations
 
 async function fetchDatesData(page) {
     return await page.$$eval(
@@ -34,18 +35,27 @@ async function fetchSessions(page, dateIndex, movieIndex) {
                 sessions.push(session);
             }
         } catch (e) {
-            break; // Exit loop if session is not found
+            break;
         }
     }
 
     return sessions;
 }
 
-async function fetchMovieDuration(movieUrl) {
+async function fetchMovieDuration(movieTitle, movieUrl) {
+
+    if (movieDurationsCache[movieTitle]) {
+        return movieDurationsCache[movieTitle];
+    }
+
     const moviePageResponse = await axios.get(movieUrl);
     const moviePageHTML = moviePageResponse.data;
     const $ = cheerio.load(moviePageHTML);
-    return $('li:contains("Тривалість") .val').text().trim() || '00:00';
+    const movieDuration = $('li:contains("Тривалість") .val').text().trim() || '00:00';
+
+    movieDurationsCache[movieTitle] = movieDuration;
+
+    return movieDuration;
 }
 
 function calculateDurationInMinutes(movieDuration) {
@@ -71,7 +81,7 @@ function formatSessionTimes(dateFormatted, sessions, durationInMinutes) {
 async function extractCinemaData(page) {
     const result = {};
     let datesData = await fetchDatesData(page);
-    datesData = datesData.slice(1); // Remove the first element if it's not needed
+    datesData = datesData.slice(1);
 
     for (let i = 0; i < datesData.length; i++) {
         const dateRaw = datesData[i];
@@ -86,7 +96,7 @@ async function extractCinemaData(page) {
 
             const sessions = await fetchSessions(page, i, movieIndex);
             const movieUrl = `https://multiplex.ua${movieHref}`;
-            const movieDuration = await fetchMovieDuration(movieUrl);
+            const movieDuration = await fetchMovieDuration(title, movieUrl);
             const durationInMinutes = calculateDurationInMinutes(movieDuration);
             const formattedSessions = formatSessionTimes(dateFormatted, sessions, durationInMinutes);
 
