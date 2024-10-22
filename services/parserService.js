@@ -2,6 +2,11 @@ const axios = require('axios');
 const puppeteer = require('puppeteer');
 const moment = require('moment');
 const cheerio = require('cheerio');
+const https = require('https')
+
+const agent = new https.Agent({
+    rejectUnauthorized: false // This will ignore SSL verification
+  });
 
 const MAX_FILM_SESSIONS_QUANTITY = 50; // To avoid recursion and a potentially endless cycle.
 const movieDurationsCache = {}; // Object to store unique movie durations
@@ -48,7 +53,7 @@ async function fetchMovieDuration(movieTitle, movieUrl) {
         return movieDurationsCache[movieTitle];
     }
 
-    const moviePageResponse = await axios.get(movieUrl);
+    const moviePageResponse = await axios.get(movieUrl, {httpsAgent: agent});
     const moviePageHTML = moviePageResponse.data;
     const $ = cheerio.load(moviePageHTML);
     const movieDuration = $('li:contains("Тривалість") .val').text().trim() || '00:00';
@@ -108,7 +113,9 @@ async function extractCinemaData(page) {
 }
 
 async function scrapeMultiplex() {
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
     const page = await browser.newPage();
     await page.goto('https://multiplex.ua/cinema/kyiv/lavina');
 
