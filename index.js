@@ -12,4 +12,4 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', userRecommendationsController);
 
-app.listen(3000, () => console.log('Server running at http://localhost:3000'));
+app.listen( process.env.PORT, () => console.log('Server running at http://localhost:3000'));

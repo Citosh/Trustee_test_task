@@ -20,10 +20,10 @@ npm run dev
 ```
 ### 5. Complete OAuth
 Go to the following link to complete the OAuth process:
-http://localhost:3000/
+https://test-trustee-service-1043498131060.europe-west4.run.app
 ### 6. Load events:
-Once OAuth is complete, go to the following link to load event data from the parser (this usually take 7-5 seconds)
-http://localhost:3000/events
+Once OAuth is complete, go to the following link to load event data from the parser (this usually take 15-17 seconds)
+https://test-trustee-service-1043498131060.europe-west4.run.app/events
 
 ## Controller Overview
 
